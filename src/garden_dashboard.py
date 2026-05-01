@@ -236,8 +236,8 @@ def main() -> None:
     st.set_page_config(page_title="My Seattle Garden", page_icon="🌿", layout="wide")
     st.markdown(CSS, unsafe_allow_html=True)
     # Header
-    st.markdown('<div class="garden-title">🌿 My Seattle Garden</div>', unsafe_allow_html=True)
-    st.markdown('<div class="garden-subtitle">Pacific Northwest growing journal</div>',unsafe_allow_html=True)
+    st.markdown('<div class="garden-title">🌿 My Seattle Home Garden</div>', unsafe_allow_html=True)
+    st.markdown('<div class="garden-subtitle">Fruits, Vegetable and Herbs</div>',unsafe_allow_html=True)
     st.markdown("<br>", unsafe_allow_html=True)
     # sections
     today = datetime.date.today()
