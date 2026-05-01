@@ -19,7 +19,6 @@ def create_garden_database():
     conn = sqlite3.connect(DB_PATH)
     conn.execute("PRAGMA foreign_keys = ON")   # enforce FK constraints in SQLite
     cursor = conn.cursor()
-
     cursor.executescript("""
     -- ── Table 1: plant_id ───────────────────────────────────────────────────
     -- Master plant catalogue. (name, cultivar) together identify a unique plant.
@@ -74,8 +73,7 @@ def add_data(produce_cat:str, name:str, cultivar:str, genus:str, species:str,
     '''
     Insert a new plant entry across the plant_id, harvest, and lifecycle tables.
 
-    Parameters
-    ----------
+    Parameters:
     produce_cat : varchar(10), Produce category for the plant (e.g. 'greens', 'legume').
     name : varchar(20), Common name of the plant (e.g. 'kale', 'snap peas'). SHARED KEY
     cultivar : varchar(15), Cultivar name (e.g. 'Red Russian', 'Sugar Daddy'). 
@@ -132,7 +130,7 @@ def add_data(produce_cat:str, name:str, cultivar:str, genus:str, species:str,
 if __name__ == "__main__":
     DB_PATH = Path(__file__).parent.parent / "data" / "garden.db"
     
-    create_garden_database()
+    # create_garden_database()
 
     # example data add: red russian kale
     # add_data('greens','kale','Red Russian','Brassica','napus',[['main',4,12]],'2026-03-01',2026)
