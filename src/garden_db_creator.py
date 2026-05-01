@@ -12,6 +12,8 @@ import sqlite3
 from pathlib import Path
 import pandas as pd
 
+DB_PATH = Path(__file__).parent.parent / "data" / "garden.db"
+
 def nan_to_none(value):
     return None if pd.isna(value) else value
 
@@ -127,14 +129,14 @@ def add_data(produce_cat:str, name:str, cultivar:str, genus:str, species:str,
     return None
  
 
-if __name__ == "__main__":
-    DB_PATH = Path(__file__).parent.parent / "data" / "garden.db"
+# if __name__ == "__main__":
     
     # create_garden_database()
 
     # example data add: red russian kale
     # add_data('greens','kale','Red Russian','Brassica','napus',[['main',4,12]],'2026-03-01',2026)
-    # init DB with existing csv inventory
+
+    ## add existing csv inventory to DB
     # harvest_df = pd.read_csv("./garden_edibles_init.csv")
     # for i in harvest_df.index:
     #     produce,name,cult,genus,species,pdate,pend=harvest_df.loc[i,['produce_cat','plant_name','cultivar','genus','species','plant_date','plant_end']]
