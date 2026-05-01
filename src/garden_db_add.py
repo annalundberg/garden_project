@@ -190,7 +190,7 @@ def main() -> None:
     print("\n------ Summary -------")
     print(f"  Name:        {name} ({cultivar})")
     print(f"  Category:    {produce_cat}")
-    print(f"  Species:       {genus} {species}")
+    print(f"  Species:     {genus} {species}")
     print(f"  Harvest:     {harvest_windows}")
     print(f"  Plant date:  {p_date or '—'}")
     print(f"  End year:    {p_end or '—'}")
