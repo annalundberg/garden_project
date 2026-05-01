@@ -12,6 +12,8 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
+from db_util import get_connection
+
 DB_PATH = Path(__file__).parent.parent / "data" / "garden.db"
 MONTH_NAMES = {1: "Jan", 2: "Feb", 3: "Mar", 4: "Apr", 5: "May", 6: "Jun", 
                7: "Jul", 8: "Aug", 9: "Sep", 10: "Oct", 11: "Nov", 12: "Dec"}
@@ -139,22 +141,13 @@ CSS = """
 </style>
 """
 
-#### DB helper functions ####
+
+# db helpers
 @st.cache_resource          # one shared connection for the whole session
-def get_connection() -> sqlite3.Connection:
-    '''
-    Create and cache a single SQLite connection for the Streamlit session.
- 
-    Returns:
-    sqlite3.Connection- A shared connection with foreign key enforcement enabled and
-    row_factory set to sqlite3.Row for column-name access.
-    '''
-    conn = sqlite3.connect(DB_PATH, check_same_thread=False)
-    conn.execute("PRAGMA foreign_keys = ON")
-    conn.row_factory = sqlite3.Row
-    return conn
- 
- 
+def get_cached_connection():
+    return get_connection()
+
+
 def query(sql: str, params: tuple = ()) -> pd.DataFrame:
     '''
     Execute a SELECT statement and return results as a DataFrame.
@@ -167,7 +160,8 @@ def query(sql: str, params: tuple = ()) -> pd.DataFrame:
     Returns:
     Query results with column names matching the SELECT clause.
     '''
-    return pd.read_sql_query(sql, get_connection(), params=params)
+    return pd.read_sql_query(sql, get_cached_connection(), params=params)
+
 
 ### UI helper functions ###
 def build_harvest_card(name: str, cultivar: str, category: str, start_month: int, end_month: int) -> str:

@@ -7,7 +7,9 @@ from pathlib import Path
 import pandas as pd
 import math
 
-DB_PATH = Path(__file__).parent.parent / "data" / "garden.db"
+from db_util import DB_PATH
+
+
 
 def nan_to_none(value):
     '''
