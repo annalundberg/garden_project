@@ -133,8 +133,47 @@ CSS = """
         font-weight: 400;
         letter-spacing: 0.18em;
         text-transform: uppercase;
-        color: #7a8c6e;
+        color: #2c3e2d;
         margin: 1.2rem 0 0.6rem 0;
+    }
+    .coming-soon-card {
+        background: linear-gradient(135deg, #f8f5ee 60%, #ede8db);
+        border: 1px solid #ddd5c0;
+        border-left: 4px solid #c4a668;
+        border-radius: 6px;
+        padding: 1rem 1.2rem;
+        margin-bottom: 0.8rem;
+        box-shadow: 2px 3px 12px rgba(0,0,0,0.03);
+        opacity: 0.85;
+    }
+    .coming-soon-card .plant-name {
+        font-family: 'Playfair Display', serif;
+        font-size: 1.15rem;
+        font-weight: 700;
+        color: #6b6050;
+    }
+    .coming-soon-card .cultivar-name {
+        font-size: 0.85rem;
+        color: #a89880;
+        font-style: italic;
+        margin-top: 0.1rem;
+    }
+    .coming-soon-card .meta-row {
+        display: flex;
+        gap: 1rem;
+        margin-top: 0.5rem;
+        flex-wrap: wrap;
+    }
+    .coming-soon-card .tag {
+        font-size: 0.75rem;
+        font-weight: 400;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        background: #fdf6e3;
+        color: #8a6a1f;
+        border: 1px solid #e2c97e;
+        border-radius: 20px;
+        padding: 0.2rem 0.7rem;
     }
     #MainMenu, footer, header {visibility: hidden;}
     .block-container { padding-top: 2.5rem; }
@@ -191,7 +230,7 @@ def build_harvest_card(name: str, cultivar: str, category: str, start_month: int
     return h_card
 
 
-def render_harvest_section(current_month: int, month_name: str, year: int) -> None:
+def render_harvest_section(current_month:int, month_name:str, year:int) -> None:
     '''
     Query and render the 'Ready to harvest' section for the current month.
     Displays a 3-column grid of harvest cards for all plants whose harvest window includes the 
@@ -227,6 +266,76 @@ def render_harvest_section(current_month: int, month_name: str, year: int) -> No
                 st.markdown(card, unsafe_allow_html=True)
     return None
 
+
+def build_coming_soon_card(name: str, cultivar: str, category: str,
+                           start_month: int, end_month: int) -> str:
+    '''
+    Build an HTML string for a single coming soon card.
+ 
+    Styled with muted amber tones to visually distinguish upcoming
+    harvests from currently available ones.
+ 
+    Parameters
+    name : Common plant name, displayed in title case.
+    cultivar : Cultivar name, displayed in italics.
+    category : Harvest category tag (e.g. 'main', 'early', 'late').
+    start_month : Harvest window start month as an integer (1-12).
+    end_month : Harvest window end month as an integer (1-12).
+ 
+    Returns
+        An HTML string rendering the coming soon card.
+    '''
+    window = f"{MONTH_NAMES[start_month]} – {MONTH_NAMES[end_month]}"
+    soon_card = f"""<div class="coming-soon-card">
+        <div class="plant-name">{name.title()}</div>
+        <div class="cultivar-name">{cultivar}</div>
+        <div class="meta-row">
+            <span class="tag">{category}</span>
+            <span class="tag">🗓 {window}</span>
+        </div>
+    </div>"""
+    return soon_card
+ 
+ 
+def render_coming_soon_section(next_month:int, next_month_name:str, year:int) -> None:
+    '''
+    Query and render the 'Coming soon' section for next month's produce.
+    Excludes plants already harvestable this month to show only those newly coming into season. 
+    Plants are grouped by produce category. Shows an empty-state message if nothing is coming into season.
+ 
+    Parameters:
+    current_month : The current month as an integer (1-12).
+    month_name : The current month as a full string (e.g. 'April').
+    year : The current year as a 4-digit integer (e.g. 2026).
+    '''
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown('<div class="section-header">Coming soon</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="month-badge">🗓 {next_month_name} {year}</div>', unsafe_allow_html=True)
+ 
+    df = query("""SELECT p.name, p.cultivar, p.produce_cat, h.category, h.start_month, h.end_month
+               FROM   harvest h
+               JOIN   plant_id p
+               ON h.name = p.name AND h.cultivar = p.cultivar
+               WHERE  h.start_month <= ? AND h.end_month >= ?
+               AND  h.start_month > ?
+               ORDER  BY p.produce_cat, p.name, p.cultivar""",
+               (next_month, next_month, next_month - 1))
+ 
+    if df.empty:
+        st.markdown(f'<div class="empty-state">🌱 Nothing new coming into season in {next_month_name}.</div>',
+                    unsafe_allow_html=True)
+        return None
+ 
+    for produce_cat, group in df.groupby("produce_cat"):
+        st.markdown(f'<div class="category-label">{produce_cat.title()}</div>', unsafe_allow_html=True)
+        cols = st.columns(3)
+        for i, (_, row) in enumerate(group.iterrows()):
+            card = build_coming_soon_card(name=row["name"], cultivar=row["cultivar"], category=row["category"],
+                                          start_month=row["start_month"], end_month=row["end_month"])
+            with cols[i % 3]:
+                st.markdown(card, unsafe_allow_html=True)
+    return None
+
 ### main dash function ###
 def main() -> None:
     '''
@@ -241,7 +350,11 @@ def main() -> None:
     st.markdown("<br>", unsafe_allow_html=True)
     # sections
     today = datetime.date.today()
+    next_month = today.month % 12 + 1
+    next_year  = today.year + 1 if today.month == 12 else today.year
     render_harvest_section(current_month=today.month, month_name=today.strftime("%B"), year=today.year)
+    render_coming_soon_section(next_month=next_month, next_month_name=datetime.date(today.year, next_month, 1).strftime("%B"),
+                               year=next_year if today.month == 12 else today.year)
     return None
 
 if __name__ == "__main__":
