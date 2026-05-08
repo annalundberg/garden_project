@@ -6,11 +6,12 @@ Requires:
     garden.db: SQLite db containg all garden data
 '''
 
-import sqlite3
+# import sqlite3
 import datetime
 from pathlib import Path
 import pandas as pd
 import streamlit as st
+import requests
 
 from db_util import get_connection
 
@@ -244,14 +245,14 @@ def render_harvest_section(current_month:int, month_name:str, year:int) -> None:
     st.markdown('<div class="section-header">Ready to harvest</div>', unsafe_allow_html=True)
     st.markdown(f'<div class="month-badge">🗓 {month_name} {year}</div>',unsafe_allow_html=True)
     df = query("""
-        SELECT
-            p.name, p.cultivar, p.produce_cat, h.category, h.start_month, h.end_month
-        FROM   harvest h
-        JOIN   plant_id p
-            ON h.name = p.name AND h.cultivar = p.cultivar
-        WHERE  h.start_month <= ? AND h.end_month >= ?
-        ORDER  BY p.produce_cat, p.name, p.cultivar
-        """, (current_month, current_month))
+        SELECT  p.name, p.cultivar, p.produce_cat, h.category, h.start_month, h.end_month
+        FROM  harvest h
+        JOIN  plant_id p
+               ON h.name = p.name AND h.cultivar = p.cultivar
+        JOIN  lifecycle l
+               ON l.name = p.name AND l.cultivar = p.cultivar
+        WHERE  h.start_month <= ? AND h.end_month >= ? AND (l.end_year IS NULL OR l.end_year >= ?)
+        ORDER  BY p.produce_cat, p.name, p.cultivar""", (current_month, current_month, year))
     if df.empty:
         st.markdown(f'<div class="empty-state">🌱 Nothing to harvest in {month_name} — check back soon.</div>',
                     unsafe_allow_html=True)
@@ -312,14 +313,16 @@ def render_coming_soon_section(next_month:int, next_month_name:str, year:int) ->
     st.markdown('<div class="section-header">Coming soon</div>', unsafe_allow_html=True)
     st.markdown(f'<div class="month-badge">🗓 {next_month_name} {year}</div>', unsafe_allow_html=True)
  
-    df = query("""SELECT p.name, p.cultivar, p.produce_cat, h.category, h.start_month, h.end_month
-               FROM   harvest h
-               JOIN   plant_id p
-               ON h.name = p.name AND h.cultivar = p.cultivar
-               WHERE  h.start_month <= ? AND h.end_month >= ?
-               AND  h.start_month > ?
-               ORDER  BY p.produce_cat, p.name, p.cultivar""",
-               (next_month, next_month, next_month - 1))
+    df = query("""
+               SELECT  p.name, p.cultivar, p.produce_cat, h.category, h.start_month, h.end_month
+               FROM  harvest h
+               JOIN  plant_id p
+                    ON  h.name = p.name AND h.cultivar = p.cultivar
+               JOIN  lifecycle l
+                    ON l.name = p.name AND l.cultivar = p.cultivar
+               WHERE  h.start_month <= ? AND h.end_month >= ? AND  h.start_month > ?
+                AND (l.end_year IS NULL OR l.end_year >= ?)
+               ORDER  BY p.produce_cat, p.name, p.cultivar""", (next_month, next_month, next_month - 1, year))
  
     if df.empty:
         st.markdown(f'<div class="empty-state">🌱 Nothing new coming into season in {next_month_name}.</div>',
