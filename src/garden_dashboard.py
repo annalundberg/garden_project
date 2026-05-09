@@ -18,6 +18,10 @@ from db_util import get_connection
 DB_PATH = Path(__file__).parent.parent / "data" / "garden.db"
 MONTH_NAMES = {1: "Jan", 2: "Feb", 3: "Mar", 4: "Apr", 5: "May", 6: "Jun", 
                7: "Jul", 8: "Aug", 9: "Sep", 10: "Oct", 11: "Nov", 12: "Dec"}
+SEATAC_LAT, SEATAC_LON = 47.4502, -122.3088
+PRECIP_WARNING_CM = 2.5
+
+## Dashboard Page Design ##
 CSS = """
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Lato:wght@300;400&display=swap');
@@ -176,13 +180,165 @@ CSS = """
         border-radius: 20px;
         padding: 0.2rem 0.7rem;
     }
+    .weather-strip {
+        background: linear-gradient(135deg, #2c3e2d 0%, #3d5c3a 100%);
+        border-radius: 8px;
+        padding: 1.2rem 1.5rem;
+        margin-bottom: 1.5rem;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0rem;
+    }
+    .weather-stat {
+        flex: 1;
+        min-width: 120px;
+        text-align: center;
+        padding: 0.4rem 0.8rem;
+        border-right: 1px solid rgba(255,255,255,0.12);
+    }
+    .weather-stat:last-child { border-right: none; }
+    .weather-stat .stat-value {
+        font-family: 'Playfair Display', serif;
+        font-size: 1.6rem;
+        font-weight: 700;
+        color: #f5f0e8;
+        line-height: 1.1;
+    }
+    .weather-stat .stat-label {
+        font-size: 0.7rem;
+        font-weight: 400;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: #9ab88a;
+        margin-top: 0.2rem;
+    }
+    .weather-stat .stat-sub {
+        font-size: 0.78rem;
+        color: #b8c9a8;
+        margin-top: 0.15rem;
+    }
+    .precip-warning {
+        background: rgba(74,130,195,0.15);
+        border: 1px solid #4a82c3;
+        border-radius: 6px;
+        padding: 0.5rem 1rem;
+        color: #4a82c3;
+        font-size: 0.85rem;
+        margin-top: 0.6rem;
+        letter-spacing: 0.03em;
+    }
     #MainMenu, footer, header {visibility: hidden;}
     .block-container { padding-top: 2.5rem; }
 </style>
 """
 
 
-# db helpers
+## weather helpers ##
+@st.cache_data(ttl=1800)
+def fetch_weather() -> dict:
+    '''
+    Fetch current conditions and the past 7 days of weather for SeaTac
+    from the Open-Meteo API. Results are cached for 30 minutes.
+
+    Returns
+        Parsed JSON response containing:
+        - current: temperature_2m, precipitation, relative_humidity_2m,
+                   wind_speed_10m
+        - daily:   temperature_2m_max, temperature_2m_min,
+                   precipitation_sum (past 7 days including today)
+    Raises
+        requests.HTTPError, if the Open-Meteo API returns a non-2xx response.
+    '''
+    url = "https://api.open-meteo.com/v1/forecast"
+    params = {"latitude": SEATAC_LAT, "longitude": SEATAC_LON,
+              "current": "temperature_2m,precipitation,relative_humidity_2m,wind_speed_10m",
+              "daily": "temperature_2m_max,temperature_2m_min,precipitation_sum",
+              "temperature_unit": "celsius", "wind_speed_unit": "kmh", "precipitation_unit": "mm",
+              "timezone": "US/Pacific", "past_days": 7, "forecast_days": 1}
+    response = requests.get(url, params=params, timeout=10)
+    response.raise_for_status()
+    return response.json()
+
+
+def render_weather_section() -> None:
+    '''
+    Fetch and render the weather strip at the top of the dashboard. 
+    Displays four stats in a dark green strip:
+        Current temperature (°C/F), Current humidity (%), 
+        Current wind speed (mph), Current precipitation (cm)
+    Below the strip, shows a 7-day summary row:
+        Overnight low / daytime high range averaged over the past 7 days
+        Total precipitation over the past 7 days (today inclusive)
+    A warning is displayed if total 7-day precipitation is below PRECIP_WARNING_CM.
+    '''
+    try:
+        data = fetch_weather()
+    except Exception as e:
+        st.warning(f"⚠️ Weather data unavailable: {e}")
+        with st.expander("🔍 Debug — API request params"):
+            st.json({"latitude": SEATAC_LAT, "longitude": SEATAC_LON,
+                "current": "temperature_2m,precipitation,relative_humidity_2m,wind_speed_10m",
+                "daily": "temperature_2m_max,temperature_2m_min,precipitation_sum",
+                "temperature_unit": "celsius", "wind_speed_unit": "kmh", "precipitation_unit": "mm",
+                "timezone": "US/Pacific", "past_days": 7, "forecast_days": 1})
+        return
+    current, daily = data["current"], data["daily"]
+    temp_c = current["temperature_2m"]
+    temp_f = round(temp_c * 9 / 5 + 32, 1)
+    humidity = current["relative_humidity_2m"]
+    wind_kmh = current["wind_speed_10m"]
+    wind_mph = round(wind_kmh * 0.621371, 1)
+    precip_now = current["precipitation"]/10 # mm to cm
+    avg_low_c = round(sum(daily["temperature_2m_min"]) / len(daily["temperature_2m_min"]), 1)
+    avg_high_c = round(sum(daily["temperature_2m_max"]) / len(daily["temperature_2m_max"]), 1)
+    avg_low_f = round(avg_low_c * 9 / 5 + 32, 1)
+    avg_high_f = round(avg_high_c * 9 / 5 + 32, 1)
+    total_precip = round(sum(daily["precipitation_sum"])/10, 2) # mm to cm
+    ## current conditions strip ##
+    st.markdown(f"""
+    <div class="weather-strip">
+        <div class="weather-stat">
+            <div class="stat-value">{temp_c:.0f}°C</div>
+            <div class="stat-label">Temperature</div>
+            <div class="stat-sub">{temp_f:.0f}°F</div>
+        </div>
+        <div class="weather-stat">
+            <div class="stat-value">{humidity}%</div>
+            <div class="stat-label">Humidity</div>
+        </div>
+        <div class="weather-stat">
+            <div class="stat-value">{wind_kmh:.0f} km/h</div>
+            <div class="stat-label">Wind Speed</div>
+            <div class="stat-sub">{wind_mph:.0f} mph</div>
+        </div>
+        <div class="weather-stat">
+            <div class="stat-value">{precip_now:.2f} cm</div>
+            <div class="stat-label">Precipitation</div>
+        </div>
+    </div>""", unsafe_allow_html=True)
+    ## 7-day summary strip ##
+    st.markdown(f"""
+    <div class="weather-strip">
+        <div class="weather-stat">
+            <div class="stat-value">{avg_low_c:.0f}° – {avg_high_c:.0f}°C</div>
+            <div class="stat-label">7-Day Temp Range</div>
+            <div class="stat-sub">{avg_low_f:.0f}° – {avg_high_f:.0f}°F &nbsp;|&nbsp; avg low / high</div>
+        </div>
+        <div class="weather-stat">
+            <div class="stat-value">{total_precip:.2f} cm</div>
+            <div class="stat-label">7-Day Precipitation</div>
+            <div class="stat-sub">past 7 days including today</div>
+        </div>
+    </div>""", unsafe_allow_html=True)
+    ## supplemental water warning ##
+    if total_precip < PRECIP_WARNING_CM:
+        st.markdown(f'<div class="precip-warning">'
+            f'💧 Only {total_precip:.2f} cm of rain in the past 7 days — '
+            f'supplemental watering is recommended.'
+            f'</div>', unsafe_allow_html=True)
+    return None
+
+## db helpers
 @st.cache_resource          # one shared connection for the whole session
 def get_cached_connection():
     return get_connection()
@@ -339,6 +495,7 @@ def render_coming_soon_section(next_month:int, next_month_name:str, year:int) ->
                 st.markdown(card, unsafe_allow_html=True)
     return None
 
+
 ### main dash function ###
 def main() -> None:
     '''
@@ -355,6 +512,7 @@ def main() -> None:
     today = datetime.date.today()
     next_month = today.month % 12 + 1
     next_year  = today.year + 1 if today.month == 12 else today.year
+    render_weather_section()
     render_harvest_section(current_month=today.month, month_name=today.strftime("%B"), year=today.year)
     render_coming_soon_section(next_month=next_month, next_month_name=datetime.date(today.year, next_month, 1).strftime("%B"),
                                year=next_year if today.month == 12 else today.year)
