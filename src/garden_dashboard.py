@@ -14,12 +14,13 @@ import streamlit as st
 import requests
 
 from db_util import get_connection
+from weather_graphics import get_weather_graphic
 
 DB_PATH = Path(__file__).parent.parent / "data" / "garden.db"
+LAT, LON = 47.4502, -122.3088
+PRECIP_WARNING_CM = 2.5
 MONTH_NAMES = {1: "Jan", 2: "Feb", 3: "Mar", 4: "Apr", 5: "May", 6: "Jun", 
                7: "Jul", 8: "Aug", 9: "Sep", 10: "Oct", 11: "Nov", 12: "Dec"}
-SEATAC_LAT, SEATAC_LON = 47.4502, -122.3088
-PRECIP_WARNING_CM = 2.5
 
 ## Dashboard Page Design ##
 CSS = """
@@ -222,7 +223,7 @@ CSS = """
         border: 1px solid #4a82c3;
         border-radius: 6px;
         padding: 0.5rem 1rem;
-        color: #4a82c3;
+        color: #a8c8f0;
         font-size: 0.85rem;
         margin-top: 0.6rem;
         letter-spacing: 0.03em;
@@ -250,8 +251,8 @@ def fetch_weather() -> dict:
         requests.HTTPError, if the Open-Meteo API returns a non-2xx response.
     '''
     url = "https://api.open-meteo.com/v1/forecast"
-    params = {"latitude": SEATAC_LAT, "longitude": SEATAC_LON,
-              "current": "temperature_2m,precipitation,relative_humidity_2m,wind_speed_10m",
+    params = {"latitude": LAT, "longitude": LON, "hourly": "soil_temperature_6cm",
+              "current": "temperature_2m,precipitation,relative_humidity_2m,wind_speed_10m,weather_code",
               "daily": "temperature_2m_max,temperature_2m_min,precipitation_sum",
               "temperature_unit": "celsius", "wind_speed_unit": "kmh", "precipitation_unit": "mm",
               "timezone": "US/Pacific", "past_days": 7, "forecast_days": 1}
@@ -276,27 +277,33 @@ def render_weather_section() -> None:
     except Exception as e:
         st.warning(f"⚠️ Weather data unavailable: {e}")
         with st.expander("🔍 Debug — API request params"):
-            st.json({"latitude": SEATAC_LAT, "longitude": SEATAC_LON,
-                "current": "temperature_2m,precipitation,relative_humidity_2m,wind_speed_10m",
+            st.json({"latitude": LAT, "longitude": LON, "hourly": "soil_temperature_6cm",
+                "current": "temperature_2m,precipitation,relative_humidity_2m,wind_speed_10m,weather_code",
                 "daily": "temperature_2m_max,temperature_2m_min,precipitation_sum",
                 "temperature_unit": "celsius", "wind_speed_unit": "kmh", "precipitation_unit": "mm",
                 "timezone": "US/Pacific", "past_days": 7, "forecast_days": 1})
         return
-    current, daily = data["current"], data["daily"]
+    current, daily, hourly = data["current"], data["daily"], data["hourly"]
     temp_c = current["temperature_2m"]
     temp_f = round(temp_c * 9 / 5 + 32, 1)
     humidity = current["relative_humidity_2m"]
     wind_kmh = current["wind_speed_10m"]
     wind_mph = round(wind_kmh * 0.621371, 1)
     precip_now = current["precipitation"]/10 # mm to cm
+    graphic = get_weather_graphic(current['weather_code'])
     avg_low_c = round(sum(daily["temperature_2m_min"]) / len(daily["temperature_2m_min"]), 1)
     avg_high_c = round(sum(daily["temperature_2m_max"]) / len(daily["temperature_2m_max"]), 1)
     avg_low_f = round(avg_low_c * 9 / 5 + 32, 1)
     avg_high_f = round(avg_high_c * 9 / 5 + 32, 1)
     total_precip = round(sum(daily["precipitation_sum"])/10, 2) # mm to cm
+    # Average soil temp — filter out None values from hourly data
+    soil_temps = [v for v in hourly["soil_temperature_6cm"] if v is not None]
+    avg_soil_c = round(sum(soil_temps) / len(soil_temps), 1) if soil_temps else None
+    avg_soil_f = round(avg_soil_c * 9 / 5 + 32, 1) if avg_soil_c is not None else None
+    soil_display = f"{avg_soil_c:.0f}°C" if avg_soil_c is not None else "—"
+    soil_sub = f"{avg_soil_f:.0f}°F" if avg_soil_f is not None else ""
     ## current conditions strip ##
-    st.markdown(f"""
-    <div class="weather-strip">
+    current_html = f"""
         <div class="weather-stat">
             <div class="stat-value">{temp_c:.0f}°C</div>
             <div class="stat-label">Temperature</div>
@@ -315,14 +322,27 @@ def render_weather_section() -> None:
             <div class="stat-value">{precip_now:.2f} cm</div>
             <div class="stat-label">Precipitation</div>
         </div>
-    </div>""", unsafe_allow_html=True)
+    </div>"""
+    graphic_html = (
+        '<div class="weather-stat" style="flex:0 0 90px; border-right: 1px solid rgba(255,255,255,0.12);">'
+        + graphic["svg"]
+        + '<div class="stat-label" style="margin-top:0.3rem;">' + graphic["label"] + "</div>"
+        + "</div>"
+    )
+    st.markdown('<div class="weather-strip">' + graphic_html + current_html + "</div>",unsafe_allow_html=True)
+    
     ## 7-day summary strip ##
     st.markdown(f"""
     <div class="weather-strip">
         <div class="weather-stat">
             <div class="stat-value">{avg_low_c:.0f}° – {avg_high_c:.0f}°C</div>
-            <div class="stat-label">7-Day Temp Range</div>
+            <div class="stat-label">7-Day Avg Temp Range</div>
             <div class="stat-sub">{avg_low_f:.0f}° – {avg_high_f:.0f}°F &nbsp;|&nbsp; avg low / high</div>
+        </div>
+        <div class="weather-stat">
+            <div class="stat-value">{soil_display}</div>
+            <div class="stat-label">7-Day Avg Soil Temp</div>
+            <div class="stat-sub">{soil_sub} &nbsp;|&nbsp; 6cm depth, hourly metric</div>
         </div>
         <div class="weather-stat">
             <div class="stat-value">{total_precip:.2f} cm</div>
