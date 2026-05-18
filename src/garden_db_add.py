@@ -7,7 +7,7 @@ from pathlib import Path
 import pandas as pd
 import math
 
-from db_util import DB_PATH
+from db_util import DB_PATH, get_connection
 
 
 
@@ -50,8 +50,9 @@ def add_data(produce_cat:str, name:str, cultivar:str, genus:str, species:str,
     for window in harvest_windows:
         [h_cat, mm_s, mm_e] = window
         h_windows.append((str(h_cat), int(mm_s), int(mm_e), str(name), str(cultivar)))
-    conn = sqlite3.connect(DB_PATH)
-    conn.execute("PRAGMA foreign_keys = ON")
+    # conn = sqlite3.connect(DB_PATH)
+    # conn.execute("PRAGMA foreign_keys = ON")
+    conn = get_connection()
     cursor = conn.cursor()
  
     ## Table 1: plant_id

@@ -1,5 +1,6 @@
 '''
 SQLite garden DB util functions
+Independent from streamlit dependencies for offline module use.
 '''
 
 
@@ -11,7 +12,7 @@ DB_PATH = Path(__file__).parent.parent / "data" / "garden.db"
 
 def get_connection() -> sqlite3.Connection:
     '''
-    Create and cache a single SQLite connection for the Streamlit session.
+    Create a single SQLite connection.
  
     Returns:
     sqlite3.Connection- A shared connection with foreign key enforcement enabled and
