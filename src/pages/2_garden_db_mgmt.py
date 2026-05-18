@@ -10,7 +10,8 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
-from db_util import get_connection
+from db_util import execute
+from st_db_util import query
 
 
 DB_PATH = Path(__file__).parent.parent.parent / "data" / "garden.db"
@@ -85,3 +86,57 @@ CSS = """
     .block-container { padding-top: 2.5rem; }
 </style>
 """
+
+
+def render_plant_lookup() -> None:
+    '''
+    Render the plant lookup section.
+    Accepts a plant name as input and returns all matching cultivars
+    from plant_id, along with produce category and taxonomy.
+    '''
+    st.markdown('<div class="section-header">Look up a plant</div>', unsafe_allow_html=True)
+    name_input = st.text_input("Plant name", placeholder="e.g. kale", key="lookup_name")
+    if not st.button("Search", key="btn_lookup"):
+        return
+    name_clean = name_input.strip().lower()
+    if not name_clean:
+        st.warning("Please enter a plant name to search.")
+        return
+    df = query("""
+        SELECT name, cultivar, produce_cat, genus, species
+        FROM   plant_id
+        WHERE  LOWER(name) = ?
+        ORDER  BY cultivar""",(name_clean,))
+    if df.empty:
+        st.markdown(f'<div class="not-found">No entries found for "{name_clean}" in the database.</div>',
+                    unsafe_allow_html=True)
+        return
+    st.success(f"Found {len(df)} cultivar(s) for **{name_clean}**:")
+    for _, row in df.iterrows():
+        st.markdown(f"""
+        <div class="result-card">
+            <div class="plant-name">{row['name'].title()}</div>
+            <div class="cultivar-name">{row['cultivar']}</div>
+            <div style="font-size:0.8rem; color:#7a8c6e; margin-top:0.3rem;">
+                {row['produce_cat']} &nbsp;·&nbsp;
+                <em>{row['genus']} {row['species']}</em>
+            </div>
+        </div>""", unsafe_allow_html=True)
+    return
+
+
+def main() -> None:
+    '''
+    Configure and render the database management page.
+    '''
+    st.set_page_config(page_title="Garden Database", page_icon="🗃️", layout="wide")
+    st.markdown(CSS, unsafe_allow_html=True)
+    st.markdown('<div class="page-title">🗃️ Database Manager</div>', unsafe_allow_html=True)
+    st.markdown('<div class="page-subtitle">inspect and edit your garden records</div>', unsafe_allow_html=True)
+
+    render_plant_lookup()
+    return None
+
+
+if __name__ == "__main__":
+    main()

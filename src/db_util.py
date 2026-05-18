@@ -23,3 +23,17 @@ def get_connection() -> sqlite3.Connection:
     conn.row_factory = sqlite3.Row
     return conn
  
+
+def execute(sql: str, params: tuple = ()) -> None:
+    '''
+    Execute an INSERT, UPDATE, or DELETE statement.
+
+    Parameters:
+    sql: A parameterised SQL statement using ? placeholders.
+    params: Values/parameters to place into SQL statement.
+    '''
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute("PRAGMA foreign_keys = ON")
+        conn.execute(sql, params)
+        conn.commit()
+    return None
