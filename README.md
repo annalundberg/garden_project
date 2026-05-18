@@ -3,15 +3,15 @@ Garden edibles tracking and projection project. Just for fun.
 
 ## Remember to activate the environment
 
-'''
+```
 source garden_env/bin/activate
-'''
+```
 
 ## Launching the Dashboard
 
-'''
+```
 streamlit run src/1_garden_dashboard.py
-'''
+```
 
 ## Helpful functions for updating & checking database
 
