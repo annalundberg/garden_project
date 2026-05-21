@@ -223,7 +223,7 @@ CSS = """
         border: 1px solid #4a82c3;
         border-radius: 6px;
         padding: 0.5rem 1rem;
-        color: #a8c8f0;
+        color: #4a82c3;
         font-size: 0.85rem;
         margin-top: 0.6rem;
         letter-spacing: 0.03em;
