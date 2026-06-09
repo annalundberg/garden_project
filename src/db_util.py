@@ -1,5 +1,6 @@
 '''
 SQLite garden DB util functions
+Independent from streamlit dependencies for offline module use.
 '''
 
 
@@ -11,7 +12,7 @@ DB_PATH = Path(__file__).parent.parent / "data" / "garden.db"
 
 def get_connection() -> sqlite3.Connection:
     '''
-    Create and cache a single SQLite connection for the Streamlit session.
+    Create a single SQLite connection.
  
     Returns:
     sqlite3.Connection- A shared connection with foreign key enforcement enabled and
@@ -22,3 +23,17 @@ def get_connection() -> sqlite3.Connection:
     conn.row_factory = sqlite3.Row
     return conn
  
+
+def execute(sql: str, params: tuple = ()) -> None:
+    '''
+    Execute an INSERT, UPDATE, or DELETE statement.
+
+    Parameters:
+    sql: A parameterised SQL statement using ? placeholders.
+    params: Values/parameters to place into SQL statement.
+    '''
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute("PRAGMA foreign_keys = ON")
+        conn.execute(sql, params)
+        conn.commit()
+    return None
